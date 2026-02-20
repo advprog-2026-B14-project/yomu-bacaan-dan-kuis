@@ -49,7 +49,7 @@ tasks.test {
     filter {
         excludeTestsMatching("*FunctionalTest")
     }
-    finalizedBy(tasks.jacocoTestReport)
+    finalizedBy(tasks.jacocoTestReport, tasks.jacocoTestCoverageVerification)
 }
 
 tasks.register<Test>("unitTest") {
@@ -75,6 +75,53 @@ tasks.jacocoTestReport {
     reports {
         xml.required.set(true) 
         html.required.set(true)
+        csv.required.set(false)
+    }
+
+    // Exclude Spring Boot Application class from coverage report
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) {
+                exclude("**/YomuBacaanDanKuisApplication.class")
+            }
+        })
+    )
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.jacocoTestReport)
+
+    // Exclude Spring Boot Application class from coverage verification
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) {
+                exclude("**/YomuBacaanDanKuisApplication.class")
+            }
+        })
+    )
+    
+    violationRules {
+        rule {
+            limit {
+                minimum = "1.00".toBigDecimal()
+            }
+        }
+        rule {
+            element = "CLASS"
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "1.00".toBigDecimal()
+            }
+        }
+        rule {
+            element = "CLASS"
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "1.00".toBigDecimal()
+            }
+        }
     }
 }
 
@@ -84,5 +131,8 @@ sonar {
         property("sonar.organization", "advprog-2026-b14-project")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
+
+        // Exclude Spring Boot App class
+        property("sonar.coverage.exclusions", "**/YomuBacaanDanKuisApplication.java")
     }
 }
