@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.yomubacaandankuis.service;
 
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerReadingResponse;
+import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerQuizQuestionResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.Category;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.Quiz;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.QuizAttempt;
@@ -68,6 +69,43 @@ class LearnerQuizServiceTest {
     }
 
     @Test
+    void startQuizCreatesInProgressAttemptWhenNoAttemptExists() {
+        Reading reading = createReading(10);
+
+        when(quizAttemptRepository.existsByStudentIdAndReadingIdAndStatus(
+                "student-1",
+                10,
+                QuizAttemptStatus.COMPLETED
+        )).thenReturn(false);
+        when(quizAttemptRepository.findByStudentIdAndReadingId("student-1", 10))
+                .thenReturn(Optional.empty());
+        when(readingRepository.findById(10)).thenReturn(Optional.of(reading));
+
+        learnerQuizService.startQuiz("student-1", 10);
+
+        verify(quizAttemptRepository).save(any(QuizAttempt.class));
+    }
+
+    @Test
+    void startQuizKeepsExistingInProgressAttempt() {
+        QuizAttempt attempt = new QuizAttempt();
+        attempt.setStatus(QuizAttemptStatus.IN_PROGRESS);
+
+        when(quizAttemptRepository.existsByStudentIdAndReadingIdAndStatus(
+                "student-1",
+                10,
+                QuizAttemptStatus.COMPLETED
+        )).thenReturn(false);
+        when(quizAttemptRepository.findByStudentIdAndReadingId("student-1", 10))
+                .thenReturn(Optional.of(attempt));
+
+        learnerQuizService.startQuiz("student-1", 10);
+
+        verify(readingRepository, never()).findById(10);
+        verify(quizAttemptRepository, never()).save(any(QuizAttempt.class));
+    }
+
+    @Test
     void submitQuizChangesInProgressToCompleted() {
         QuizAttempt attempt = new QuizAttempt();
         attempt.setId(1);
@@ -93,6 +131,59 @@ class LearnerQuizServiceTest {
     }
 
     @Test
+    void submitQuizRejectedWhenAttemptHasNotStarted() {
+        when(quizAttemptRepository.findByStudentIdAndReadingId("student-1", 3))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> learnerQuizService.submitQuiz("student-1", 3, Map.of()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(exception -> {
+                    ResponseStatusException responseStatusException = (ResponseStatusException) exception;
+                    assertThat(responseStatusException.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(responseStatusException.getReason()).isEqualTo("Quiz attempt has not been started");
+                });
+
+        verify(quizRepository, never()).findByReadingId(3);
+        verify(quizAttemptRepository, never()).save(any(QuizAttempt.class));
+    }
+
+    @Test
+    void submitQuizRejectedWhenAttemptAlreadyCompleted() {
+        QuizAttempt attempt = new QuizAttempt();
+        attempt.setStatus(QuizAttemptStatus.COMPLETED);
+
+        when(quizAttemptRepository.findByStudentIdAndReadingId("student-1", 3))
+                .thenReturn(Optional.of(attempt));
+
+        assertThatThrownBy(() -> learnerQuizService.submitQuiz("student-1", 3, Map.of()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(exception -> {
+                    ResponseStatusException responseStatusException = (ResponseStatusException) exception;
+                    assertThat(responseStatusException.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(responseStatusException.getReason()).isEqualTo("Quiz already completed for this reading");
+                });
+
+        verify(quizRepository, never()).findByReadingId(3);
+        verify(quizAttemptRepository, never()).save(any(QuizAttempt.class));
+    }
+
+    @Test
+    void submitQuizWithNoAnswersReturnsZeroScore() {
+        QuizAttempt attempt = new QuizAttempt();
+        attempt.setStatus(QuizAttemptStatus.IN_PROGRESS);
+
+        when(quizAttemptRepository.findByStudentIdAndReadingId("student-1", 3))
+                .thenReturn(Optional.of(attempt));
+        when(quizRepository.findByReadingId(3)).thenReturn(List.of(createQuiz(101, 3, "A")));
+
+        Integer score = learnerQuizService.submitQuiz("student-1", 3, null);
+
+        assertThat(score).isZero();
+        assertThat(attempt.getStatus()).isEqualTo(QuizAttemptStatus.COMPLETED);
+        verify(quizAttemptRepository).save(attempt);
+    }
+
+    @Test
     void getReadingForLearnerClearsContentWhenInProgress() {
         Reading reading = createReading(12);
         QuizAttempt attempt = new QuizAttempt();
@@ -111,6 +202,48 @@ class LearnerQuizServiceTest {
         assertThat(response.getTitle()).isEqualTo("Gravity");
         assertThat(response.getContent()).isEmpty();
         assertThat(response.isLocked()).isTrue();
+    }
+
+    @Test
+    void getReadingForLearnerShowsContentWhenNoAttemptIsInProgress() {
+        Reading reading = createReading(12);
+
+        when(readingRepository.findById(12)).thenReturn(Optional.of(reading));
+        when(quizAttemptRepository.findByStudentIdAndReadingId("student-2", 12))
+                .thenReturn(Optional.empty());
+
+        LearnerReadingResponse response = learnerQuizService.getReadingForLearner("student-2", 12);
+
+        assertThat(response.getContent()).isEqualTo("Detailed content");
+        assertThat(response.isLocked()).isFalse();
+    }
+
+    @Test
+    void getQuizQuestionsForLearnerReturnsQuestionsWithoutCorrectAnswers() {
+        Reading reading = createReading(12);
+        Quiz quiz = createQuiz(101, 12, "A");
+
+        when(readingRepository.findById(12)).thenReturn(Optional.of(reading));
+        when(quizRepository.findByReadingId(12)).thenReturn(List.of(quiz));
+
+        List<LearnerQuizQuestionResponse> questions = learnerQuizService.getQuizQuestionsForLearner("student-2", 12);
+
+        assertThat(questions).hasSize(1);
+        assertThat(questions.getFirst().getQuestion()).isEqualTo("Q101");
+        assertThat(questions.getFirst().getOptionA()).isEqualTo("A");
+    }
+
+    @Test
+    void getReadingForLearnerRejectedWhenReadingDoesNotExist() {
+        when(readingRepository.findById(404)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> learnerQuizService.getReadingForLearner("student-2", 404))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(exception -> {
+                    ResponseStatusException responseStatusException = (ResponseStatusException) exception;
+                    assertThat(responseStatusException.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+                    assertThat(responseStatusException.getReason()).isEqualTo("Reading with id 404 not found");
+                });
     }
 
     private Reading createReading(Integer id) {

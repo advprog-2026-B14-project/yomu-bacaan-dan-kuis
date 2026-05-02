@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface QuizRepository extends JpaRepository<Quiz, Integer> {
 	List<Quiz> findByReadingId(Integer readingId);
+
+	long countByReadingId(Integer readingId);
 }

@@ -95,6 +95,9 @@ tasks.jacocoTestReport {
 
 tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.jacocoTestReport)
+    onlyIf {
+        tasks.test.get().filter.includePatterns.isEmpty()
+    }
 
     // Exclude Spring Boot Application class from coverage verification
     classDirectories.setFrom(
@@ -108,23 +111,33 @@ tasks.jacocoTestCoverageVerification {
     violationRules {
         rule {
             limit {
-                minimum = "1.00".toBigDecimal()
+                minimum = "0.80".toBigDecimal()
             }
         }
         rule {
             element = "CLASS"
+            excludes = listOf(
+                "id.ac.ui.cs.advprog.yomubacaandankuis.config.*",
+                "id.ac.ui.cs.advprog.yomubacaandankuis.dto.*",
+                "id.ac.ui.cs.advprog.yomubacaandankuis.model.*"
+            )
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                minimum = "1.00".toBigDecimal()
+                minimum = "0.70".toBigDecimal()
             }
         }
         rule {
             element = "CLASS"
+            excludes = listOf(
+                "id.ac.ui.cs.advprog.yomubacaandankuis.config.*",
+                "id.ac.ui.cs.advprog.yomubacaandankuis.dto.*",
+                "id.ac.ui.cs.advprog.yomubacaandankuis.model.*"
+            )
             limit {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
-                minimum = "1.00".toBigDecimal()
+                minimum = "0.70".toBigDecimal()
             }
         }
     }

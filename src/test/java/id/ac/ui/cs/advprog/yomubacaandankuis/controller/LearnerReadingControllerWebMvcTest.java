@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.yomubacaandankuis.controller;
 
+import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerQuizQuestionResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerReadingResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.service.LearnerQuizService;
 import org.junit.jupiter.api.Test;
@@ -11,8 +12,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -54,7 +59,7 @@ class LearnerReadingControllerWebMvcTest {
     void getReadingWhenInProgressDoesNotShowContent() throws Exception {
         LearnerReadingResponse response = new LearnerReadingResponse(10, "Gravity", "", 7, true);
 
-        org.mockito.Mockito.when(learnerQuizService.getReadingForLearner("student-1", 10))
+        when(learnerQuizService.getReadingForLearner("student-1", 10))
                 .thenReturn(response);
 
         mockMvc.perform(get("/api/learner/readings/10")
@@ -63,5 +68,31 @@ class LearnerReadingControllerWebMvcTest {
                 .andExpect(jsonPath("$.id").value(10))
                 .andExpect(jsonPath("$.content").value(""))
                 .andExpect(jsonPath("$.isLocked").value(true));
+    }
+
+    @Test
+    void getQuizQuestionsReturnsOptionsWithoutCorrectAnswer() throws Exception {
+        when(learnerQuizService.getQuizQuestionsForLearner("student-1", 10))
+                .thenReturn(List.of(new LearnerQuizQuestionResponse("Question?", "A", "B", "C", "D")));
+
+        mockMvc.perform(get("/api/learner/readings/10/quiz")
+                        .header("X-Student-Id", "student-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].question").value("Question?"))
+                .andExpect(jsonPath("$[0].optionA").value("A"))
+                .andExpect(jsonPath("$[0].correctAnswer").doesNotExist());
+    }
+
+    @Test
+    void submitQuizReturnsScore() throws Exception {
+        when(learnerQuizService.submitQuiz("student-1", 10, Map.of(101, "A")))
+                .thenReturn(1);
+
+        mockMvc.perform(post("/api/learner/readings/10/quiz/submit")
+                        .header("X-Student-Id", "student-1")
+                        .contentType("application/json")
+                        .content("{\"answers\":{\"101\":\"A\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.score").value(1));
     }
 }
