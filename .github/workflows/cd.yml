@@ -36,7 +36,7 @@ jobs:
     if: ${{ github.event.workflow_run.head_branch == 'staging' }}
     environment:
       name: staging
-      url: https://staging.yomu-bacaan-dan-kuis.example.com
+      url: https://github.com/advprog-2026-B14-project/yomu-bacaan-dan-kuis/tree/staging
     
     steps:
       - name: Checkout code
@@ -75,7 +75,7 @@ jobs:
           echo "- **Branch:** \`${{ github.event.workflow_run.head_branch }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** \`${{ github.event.workflow_run.head_sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ✅ Success (Dummy)" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** https://staging.yomu-bacaan-dan-kuis.example.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** https://github.com/advprog-2026-B14-project/yomu-bacaan-dan-kuis/tree/staging" >> $GITHUB_STEP_SUMMARY
 
   # Dummy deployment to PRODUCTION environment
   deploy-production:
@@ -86,7 +86,7 @@ jobs:
     if: ${{ github.event.workflow_run.head_branch == 'main' }}
     environment:
       name: production
-      url: https://yomu-bacaan-dan-kuis.example.com
+      url: https://github.com/advprog-2026-B14-project/yomu-bacaan-dan-kuis/tree/main
     
     steps:
       - name: Checkout code
@@ -129,7 +129,7 @@ jobs:
           echo "- **Branch:** \`${{ github.event.workflow_run.head_branch }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** \`${{ github.event.workflow_run.head_sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ✅ Success (Dummy)" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** https://yomu-bacaan-dan-kuis.example.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** https://github.com/advprog-2026-B14-project/yomu-bacaan-dan-kuis/tree/main" >> $GITHUB_STEP_SUMMARY
 
   # Notification job (runs after deployment)
   notify-deployment:
