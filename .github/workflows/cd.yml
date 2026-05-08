@@ -35,7 +35,7 @@ jobs:
     # Only run if branch is 'staging'
     if: ${{ github.event.workflow_run.head_branch == 'staging' }}
     environment:
-      name: staging
+      name: staging # fix
       url: https://staging.yomu-bacaan-dan-kuis.example.com
     
     steps:
