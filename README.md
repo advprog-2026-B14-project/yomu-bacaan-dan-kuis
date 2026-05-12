@@ -136,6 +136,8 @@ sequenceDiagram
     Controller-->>FE: LearnerSubmitQuizResponse
 ```
 
+### Code Diagram - Admin Content Management Flow
+
 ```mermaid
 sequenceDiagram
     actor Admin
@@ -179,6 +181,8 @@ sequenceDiagram
     QuizService-->>QuizController: QuizResponse
     QuizController-->>FE: Quiz created
 ```
+
+### Code Diagram - Internal Statistics Flow
 
 ```mermaid
 sequenceDiagram
