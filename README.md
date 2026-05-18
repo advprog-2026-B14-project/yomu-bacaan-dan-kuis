@@ -10,6 +10,7 @@ Dokumentasi arsitektur VPIC lengkap ada di root frontend: `../docs/VPIC_ARCHITEC
 - Spring Boot 3.4.2
 - Spring Web
 - Spring Security OAuth2 Resource Server
+- Spring Boot Actuator + Micrometer Prometheus
 - Spring Data JPA
 - Bean Validation
 - PostgreSQL/Supabase untuk runtime
@@ -49,6 +50,7 @@ JWT_ROLES_CLAIM=roles
 INTERNAL_SERVICE_TOKEN=<secret-token>
 INTERNAL_SERVICE_TOKEN_HEADER=X-Internal-Service-Token
 SECURITY_DEV_AUTH_ENABLED=false
+ACTUATOR_HEALTH_SHOW_DETAILS=when_authorized
 ```
 
 Keterangan:
@@ -64,6 +66,7 @@ Keterangan:
 - `INTERNAL_SERVICE_TOKEN`: token rahasia untuk endpoint `/api/internal/**`.
 - `INTERNAL_SERVICE_TOKEN_HEADER`: header token internal, default `X-Internal-Service-Token`.
 - `SECURITY_DEV_AUTH_ENABLED`: mode development lokal. Default `false`; jangan aktifkan di production.
+- `ACTUATOR_HEALTH_SHOW_DETAILS`: detail health actuator, default `when_authorized`.
 
 ## Menjalankan Aplikasi
 
@@ -172,6 +175,23 @@ X-Internal-Service-Token: <INTERNAL_SERVICE_TOKEN>
 - `GET /api/internal/league/statistics/students/{studentId}`
 
 Endpoint internal ini dipakai modul lain untuk membaca statistik penyelesaian kuis learner.
+
+### Observability
+
+Endpoint observability:
+
+- `GET /actuator/health`: public untuk health check.
+- `GET /actuator/prometheus`: public agar Prometheus dapat scrape metrics.
+- `GET /actuator/**` selain health/info/prometheus: membutuhkan `X-Internal-Service-Token`.
+
+Prometheus/Grafana untuk final tersedia di root project:
+
+```powershell
+cd C:\adpro\IdeaProjects\group
+docker compose -f monitoring/docker-compose.yml up
+```
+
+Buka Grafana di `http://localhost:3001` dengan user/pass `admin/admin`, lalu pilih dashboard `Yomu Bacaan dan Kuis Observability`.
 
 ## Design Pattern
 

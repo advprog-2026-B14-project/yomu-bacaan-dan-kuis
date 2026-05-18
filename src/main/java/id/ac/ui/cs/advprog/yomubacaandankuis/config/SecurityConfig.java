@@ -39,6 +39,8 @@ public class SecurityConfig {
                 .addFilterBefore(internalServiceTokenFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterBefore(devHeaderAuthenticationFilter, BearerTokenAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                        .requestMatchers("/actuator/**").hasAuthority(InternalServiceTokenFilter.INTERNAL_AUTHORITY)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/learner/**").hasRole("LEARNER")
                         .requestMatchers("/api/internal/**").hasAuthority(InternalServiceTokenFilter.INTERNAL_AUTHORITY)
