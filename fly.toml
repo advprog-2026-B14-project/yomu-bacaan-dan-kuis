@@ -7,31 +7,31 @@ app = "yomu-bacaan-dan-kuis-b14-hanif"
 primary_region = "sin"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  PORT = "8080"
-  DB_SCHEMA = "learning_mod"
-  JPA_SHOW_SQL = "false"
-  JPA_FORMAT_SQL = "false"
-  ACTUATOR_HEALTH_SHOW_DETAILS = "never"
-  SECURITY_DEV_AUTH_ENABLED = "false"
-  INTERNAL_SERVICE_TOKEN_HEADER = "X-Internal-Service-Token"
+  ACTUATOR_HEALTH_SHOW_DETAILS = 'never'
+  DB_SCHEMA = 'learning_mod'
+  INTERNAL_SERVICE_TOKEN_HEADER = 'X-Internal-Service-Token'
+  JPA_FORMAT_SQL = 'false'
+  JPA_SHOW_SQL = 'false'
+  PORT = '8080'
+  SECURITY_DEV_AUTH_ENABLED = 'false'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
-  processes = ["app"]
+  processes = ['app']
 
   [[http_service.checks]]
-    interval = "15s"
-    timeout = "5s"
-    grace_period = "30s"
-    method = "GET"
-    path = "/actuator/health"
+    interval = '15s'
+    timeout = '5s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/actuator/health'
 
 [[vm]]
   memory = '1gb'
