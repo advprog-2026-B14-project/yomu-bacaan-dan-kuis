@@ -103,6 +103,72 @@ Service berjalan di:
 http://localhost:8080
 ```
 
+## Deployment Fly.io
+
+Service ini sudah disiapkan untuk deploy ke Fly.io melalui:
+
+- `Dockerfile`
+- `.dockerignore`
+- `fly.toml`
+- `.github/workflows/fly-deploy.yml`
+
+Deploy manual pertama:
+
+```powershell
+fly auth login
+fly apps create yomu-bacaan-dan-kuis
+fly secrets set DB_URL="<supabase-postgres-jdbc-url>"
+fly secrets set DB_USERNAME="<supabase-username>"
+fly secrets set DB_PASSWORD="<supabase-password>"
+fly secrets set DB_SCHEMA="learning_mod"
+fly secrets set CORS_ALLOWED_ORIGINS="https://<frontend-vercel-url>"
+fly secrets set INTERNAL_SERVICE_TOKEN="<random-secret>"
+fly deploy
+```
+
+Jika frontend testing belum punya JWT/auth service, mode development bisa dinyalakan sementara:
+
+```powershell
+fly secrets set SECURITY_DEV_AUTH_ENABLED="true"
+```
+
+Untuk production final, matikan kembali dan gunakan JWT:
+
+```powershell
+fly secrets set SECURITY_DEV_AUTH_ENABLED="false"
+fly secrets set JWT_ISSUER_URI="<issuer-url>"
+# atau
+fly secrets set JWT_JWK_SET_URI="<jwk-set-url>"
+```
+
+URL backend setelah deploy:
+
+```text
+https://yomu-bacaan-dan-kuis.fly.dev
+```
+
+Setelah URL Fly.io aktif, set frontend Vercel:
+
+```text
+BACKEND_API_URL=https://yomu-bacaan-dan-kuis.fly.dev
+NEXT_PUBLIC_API_BASE_URL=/api/backend
+```
+
+Untuk GitHub Actions deployment, tambahkan repository secret:
+
+```text
+FLY_API_TOKEN=<token dari fly auth token>
+```
+
+Catatan rollback:
+
+```powershell
+fly releases
+fly deploy --image <previous-image>
+```
+
+Atau gunakan rollback dari dashboard/CLI Fly.io sesuai release yang ingin dikembalikan.
+
 ## Menjalankan Test dan Coverage
 
 ```powershell
