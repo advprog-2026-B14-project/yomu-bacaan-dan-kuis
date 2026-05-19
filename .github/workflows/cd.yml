@@ -1,154 +1,146 @@
 name: Continuous Deployment (CD)
 
-# Trigger CD only after CI workflow completes successfully
 on:
   workflow_run:
-    workflows: ["Continuous Integration (CI)"]  # Must match the name in ci.yml
+    workflows: ["Continuous Integration (CI)"]
     types:
       - completed
     branches:
       - staging
       - main
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Deployment action"
+        required: true
+        default: "deploy"
+        type: choice
+        options:
+          - deploy
+          - rollback
+      release_version:
+        description: "Fly.io release version for rollback, for example v12. Leave empty to rollback one release."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FLY_APP_NAME: yomu-bacaan-dan-kuis-b14-hanif
+  FLY_APP_URL: https://yomu-bacaan-dan-kuis-b14-hanif.fly.dev
 
 jobs:
-  # Job to check if CI was successful
-  check-ci-success:
-    name: Check CI Status
+  deploy:
+    name: Deploy Backend to Fly.io
     runs-on: ubuntu-latest
-    # Only run if the triggering workflow (CI) was successful
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    outputs:
-      branch: ${{ steps.extract-branch.outputs.branch }}
-    
-    steps:
-      - name: Extract branch name
-        id: extract-branch
-        run: |
-          echo "branch=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
-          echo "CI completed successfully on branch: ${{ github.event.workflow_run.head_branch }}"
-
-  # Dummy deployment to STAGING environment
-  deploy-staging:
-    name: Deploy to Staging (Dummy)
-    runs-on: ubuntu-latest
-    needs: check-ci-success
-    # Only run if branch is 'staging'
-    if: ${{ github.event.workflow_run.head_branch == 'staging' }}
+    if: >-
+      ${{
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success'
+        ) ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          inputs.action == 'deploy'
+        )
+      }}
     environment:
-      name: staging
-      url: https://github.com/advprog-2026-B14-project/yomu-bacaan-dan-kuis/tree/staging
-    
+      name: fly-io
+      url: https://yomu-bacaan-dan-kuis-b14-hanif.fly.dev
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.workflow_run.head_branch || github.ref_name }}
 
-      - name: Dummy Deployment - Staging
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Validate Fly.io authentication
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl auth whoami
+
+      - name: Deploy to Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only --app "$FLY_APP_NAME"
+
+      - name: Smoke test deployment
         run: |
-          echo "========================================"
-          echo "🚀 Dummy Deployment: STAGING"
-          echo "========================================"
-          echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.event.workflow_run.head_branch }}"
-          echo "Commit SHA: ${{ github.event.workflow_run.head_sha }}"
-          echo "Triggered by: ${{ github.event.workflow_run.triggering_actor.login }}"
-          echo "----------------------------------------"
-          echo "Simulating deployment steps:"
-          echo "  ✓ Building Docker image..."
-          sleep 2
-          echo "  ✓ Pushing to container registry..."
-          sleep 2
-          echo "  ✓ Deploying to staging environment..."
-          sleep 2
-          echo "  ✓ Running health checks..."
-          sleep 1
-          echo "----------------------------------------"
-          echo "✅ Deployment to STAGING completed successfully!"
-          echo "========================================"
+          for attempt in {1..12}; do
+            status="$(curl -fsS "$FLY_APP_URL/actuator/health" | tee health.json | jq -r '.status')"
+            if [ "$status" = "UP" ]; then
+              echo "Backend health is UP"
+              cat health.json
+              exit 0
+            fi
+            echo "Health check attempt $attempt did not return UP yet"
+            sleep 10
+          done
+          echo "Backend health did not become UP after deployment"
+          exit 1
 
-      - name: Deployment Summary
+      - name: Deployment summary
         run: |
-          echo "### 🎉 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** Staging" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** \`${{ github.event.workflow_run.head_branch }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** \`${{ github.event.workflow_run.head_sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** ✅ Success (Dummy)" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** https://github.com/advprog-2026-B14-project/yomu-bacaan-dan-kuis/tree/staging" >> $GITHUB_STEP_SUMMARY
+          echo "### Fly.io Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- App: \`$FLY_APP_NAME\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: $FLY_APP_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Health endpoint: $FLY_APP_URL/actuator/health" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: \`${{ github.event.workflow_run.head_branch || github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`${{ github.event.workflow_run.head_sha || github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Advanced deployment procedure: automatic deploy with post-deploy smoke test; manual rollback is available from this workflow." >> "$GITHUB_STEP_SUMMARY"
 
-  # Dummy deployment to PRODUCTION environment
-  deploy-production:
-    name: Deploy to Production (Dummy)
+  rollback:
+    name: Rollback Fly.io Release
     runs-on: ubuntu-latest
-    needs: check-ci-success
-    # Only run if branch is 'main'
-    if: ${{ github.event.workflow_run.head_branch == 'main' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'rollback' }}
     environment:
-      name: production
-      url: https://github.com/advprog-2026-B14-project/yomu-bacaan-dan-kuis/tree/main
-    
+      name: fly-io
+      url: https://yomu-bacaan-dan-kuis-b14-hanif.fly.dev
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - name: Dummy Deployment - Production
-        run: |
-          echo "========================================"
-          echo "🚀 Dummy Deployment: PRODUCTION"
-          echo "========================================"
-          echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.event.workflow_run.head_branch }}"
-          echo "Commit SHA: ${{ github.event.workflow_run.head_sha }}"
-          echo "Triggered by: ${{ github.event.workflow_run.triggering_actor.login }}"
-          echo "----------------------------------------"
-          echo "Simulating deployment steps:"
-          echo "  ✓ Building Docker image..."
-          sleep 2
-          echo "  ✓ Pushing to container registry..."
-          sleep 2
-          echo "  ✓ Creating backup of current production..."
-          sleep 2
-          echo "  ✓ Deploying to production environment..."
-          sleep 3
-          echo "  ✓ Running health checks..."
-          sleep 2
-          echo "  ✓ Running smoke tests..."
-          sleep 1
-          echo "----------------------------------------"
-          echo "✅ Deployment to PRODUCTION completed successfully!"
-          echo "========================================"
+      - name: Validate Fly.io authentication
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl auth whoami
 
-      - name: Deployment Summary
+      - name: Roll back release
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          echo "### 🎉 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** Production" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** \`${{ github.event.workflow_run.head_branch }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** \`${{ github.event.workflow_run.head_sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** ✅ Success (Dummy)" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** https://github.com/advprog-2026-B14-project/yomu-bacaan-dan-kuis/tree/main" >> $GITHUB_STEP_SUMMARY
-
-  # Notification job (runs after deployment)
-  notify-deployment:
-    name: Notify Deployment Status
-    runs-on: ubuntu-latest
-    needs: [check-ci-success, deploy-staging, deploy-production]
-    if: always()
-    
-    steps:
-      - name: Deployment Notification
-        run: |
-          echo "========================================"
-          echo "📢 Deployment Notification"
-          echo "========================================"
-          if [[ "${{ needs.deploy-staging.result }}" == "success" ]]; then
-            echo "✅ Staging deployment completed successfully"
-          elif [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
-            echo "✅ Production deployment completed successfully"
+          if [ -n "${{ inputs.release_version }}" ]; then
+            flyctl releases rollback "${{ inputs.release_version }}" --app "$FLY_APP_NAME" --yes
           else
-            echo "ℹ️  No deployment was triggered (branch condition not met)"
+            flyctl releases rollback --app "$FLY_APP_NAME" --yes
           fi
-          echo "========================================"
+
+      - name: Smoke test rollback
+        run: |
+          for attempt in {1..12}; do
+            status="$(curl -fsS "$FLY_APP_URL/actuator/health" | tee health.json | jq -r '.status')"
+            if [ "$status" = "UP" ]; then
+              echo "Backend health is UP after rollback"
+              cat health.json
+              exit 0
+            fi
+            echo "Rollback health check attempt $attempt did not return UP yet"
+            sleep 10
+          done
+          echo "Backend health did not become UP after rollback"
+          exit 1
+
+      - name: Rollback summary
+        run: |
+          echo "### Fly.io Rollback" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- App: \`$FLY_APP_NAME\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: $FLY_APP_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release version: \`${{ inputs.release_version || 'previous release' }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Status: rollback command completed and health check passed." >> "$GITHUB_STEP_SUMMARY"
