@@ -66,7 +66,7 @@ public class DevHeaderAuthenticationFilter extends OncePerRequestFilter {
                 "dev-token",
                 Instant.now(),
                 Instant.now().plusSeconds(3600),
-                Map.of("alg", "none"),
+                Map.of("typ", "JWT"),
                 Map.of(
                         "sub", subject,
                         studentClaim, subject,
