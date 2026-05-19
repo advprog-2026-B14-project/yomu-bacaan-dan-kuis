@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.yomubacaandankuis.service;
 
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerQuizQuestionResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerReadingResponse;
+import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerSubmitQuizResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.Quiz;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.QuizAttempt;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.QuizAttemptStatus;
@@ -61,6 +62,10 @@ public class LearnerQuizService {
     }
 
     public Integer submitQuiz(String studentId, Integer readingId, Map<Integer, String> answers) {
+        return submitQuizWithReview(studentId, readingId, answers).getScore();
+    }
+
+    public LearnerSubmitQuizResponse submitQuizWithReview(String studentId, Integer readingId, Map<Integer, String> answers) {
         QuizAttempt attempt = quizAttemptRepository.findByStudentIdAndReadingId(studentId, readingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Quiz attempt has not been started"));
 
@@ -76,7 +81,10 @@ public class LearnerQuizService {
         attempt.setCompletedAt(LocalDateTime.now());
         quizAttemptRepository.save(attempt);
 
-        return score;
+        Map<Integer, String> correctAnswers = quizzes.stream()
+                .collect(java.util.stream.Collectors.toMap(Quiz::getId, Quiz::getCorrectAnswer));
+
+        return new LearnerSubmitQuizResponse(score, quizzes.size(), correctAnswers);
     }
 
     @Transactional(readOnly = true)
@@ -131,6 +139,7 @@ public class LearnerQuizService {
 
     private LearnerQuizQuestionResponse toLearnerQuizQuestionResponse(Quiz quiz) {
         return new LearnerQuizQuestionResponse(
+                quiz.getId(),
                 quiz.getQuestion(),
                 quiz.getOptionA(),
                 quiz.getOptionB(),

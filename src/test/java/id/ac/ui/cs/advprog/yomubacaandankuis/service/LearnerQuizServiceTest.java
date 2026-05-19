@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.yomubacaandankuis.service;
 
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerReadingResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerQuizQuestionResponse;
+import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerSubmitQuizResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.Category;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.Quiz;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.QuizAttempt;
@@ -184,6 +185,33 @@ class LearnerQuizServiceTest {
     }
 
     @Test
+    void submitQuizWithReviewReturnsCorrectAnswersOnlyAfterCompletion() {
+        QuizAttempt attempt = new QuizAttempt();
+        attempt.setId(1);
+        attempt.setStudentId("student-1");
+        attempt.setReading(createReading(3));
+        attempt.setStatus(QuizAttemptStatus.IN_PROGRESS);
+
+        Quiz quiz1 = createQuiz(101, 3, "A");
+        Quiz quiz2 = createQuiz(102, 3, "B");
+
+        when(quizAttemptRepository.findByStudentIdAndReadingId("student-1", 3))
+                .thenReturn(Optional.of(attempt));
+        when(quizRepository.findByReadingId(3)).thenReturn(List.of(quiz1, quiz2));
+
+        LearnerSubmitQuizResponse response = learnerQuizService.submitQuizWithReview(
+                "student-1",
+                3,
+                Map.of(101, "A", 102, "D")
+        );
+
+        assertThat(response.getScore()).isEqualTo(1);
+        assertThat(response.getTotalQuestions()).isEqualTo(2);
+        assertThat(response.getCorrectAnswers()).containsEntry(101, "A").containsEntry(102, "B");
+        assertThat(attempt.getStatus()).isEqualTo(QuizAttemptStatus.COMPLETED);
+    }
+
+    @Test
     void getReadingForLearnerClearsContentWhenInProgress() {
         Reading reading = createReading(12);
         QuizAttempt attempt = new QuizAttempt();
@@ -229,6 +257,7 @@ class LearnerQuizServiceTest {
         List<LearnerQuizQuestionResponse> questions = learnerQuizService.getQuizQuestionsForLearner("student-2", 12);
 
         assertThat(questions).hasSize(1);
+        assertThat(questions.getFirst().getId()).isEqualTo(101);
         assertThat(questions.getFirst().getQuestion()).isEqualTo("Q101");
         assertThat(questions.getFirst().getOptionA()).isEqualTo("A");
     }

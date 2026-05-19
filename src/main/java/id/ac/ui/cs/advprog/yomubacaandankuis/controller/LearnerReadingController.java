@@ -66,13 +66,13 @@ public class LearnerReadingController {
             @RequestBody LearnerSubmitQuizRequest request
     ) {
         String studentId = learnerIdentity.studentId(authentication);
-        Integer score = learnerQuizService.submitQuiz(studentId, readingId, request.getAnswers());
+        LearnerSubmitQuizResponse response = learnerQuizService.submitQuizWithReview(studentId, readingId, request.getAnswers());
         AUDIT_LOG.info(
                 "action=QUIZ_SUBMIT entity=quiz_attempt actor={} readingId={} score={}",
                 studentId,
                 readingId,
-                score
+                response.getScore()
         );
-        return new LearnerSubmitQuizResponse(score);
+        return response;
     }
 }

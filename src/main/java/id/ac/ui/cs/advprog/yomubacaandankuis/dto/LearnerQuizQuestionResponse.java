@@ -7,6 +7,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public class LearnerQuizQuestionResponse {
 
+    private Integer id;
     private String question;
     private String optionA;
     private String optionB;

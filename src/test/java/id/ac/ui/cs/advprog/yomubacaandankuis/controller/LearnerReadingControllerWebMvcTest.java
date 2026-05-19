@@ -6,6 +6,7 @@ import id.ac.ui.cs.advprog.yomubacaandankuis.config.LearnerIdentity;
 import id.ac.ui.cs.advprog.yomubacaandankuis.config.SecurityConfig;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerQuizQuestionResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerReadingResponse;
+import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerSubmitQuizResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.service.LearnerQuizService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -98,11 +99,12 @@ class LearnerReadingControllerWebMvcTest {
     @Test
     void getQuizQuestionsReturnsOptionsWithoutCorrectAnswer() throws Exception {
         when(learnerQuizService.getQuizQuestionsForLearner("student-1", 10))
-                .thenReturn(List.of(new LearnerQuizQuestionResponse("Question?", "A", "B", "C", "D")));
+                .thenReturn(List.of(new LearnerQuizQuestionResponse(101, "Question?", "A", "B", "C", "D")));
 
         mockMvc.perform(get("/api/learner/readings/10/quiz")
                         .with(learnerJwt("student-1")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(101))
                 .andExpect(jsonPath("$[0].question").value("Question?"))
                 .andExpect(jsonPath("$[0].optionA").value("A"))
                 .andExpect(jsonPath("$[0].correctAnswer").doesNotExist());
@@ -110,15 +112,17 @@ class LearnerReadingControllerWebMvcTest {
 
     @Test
     void submitQuizReturnsScore() throws Exception {
-        when(learnerQuizService.submitQuiz("student-1", 10, Map.of(101, "A")))
-                .thenReturn(1);
+        when(learnerQuizService.submitQuizWithReview("student-1", 10, Map.of(101, "A")))
+                .thenReturn(new LearnerSubmitQuizResponse(1, 1, Map.of(101, "A")));
 
         mockMvc.perform(post("/api/learner/readings/10/quiz/submit")
                         .with(learnerJwt("student-1"))
                         .contentType("application/json")
                         .content("{\"answers\":{\"101\":\"A\"}}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.score").value(1));
+                .andExpect(jsonPath("$.score").value(1))
+                .andExpect(jsonPath("$.totalQuestions").value(1))
+                .andExpect(jsonPath("$.correctAnswers.101").value("A"));
     }
 
     @Test
