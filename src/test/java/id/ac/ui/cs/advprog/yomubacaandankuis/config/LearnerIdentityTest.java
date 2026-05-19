@@ -48,10 +48,11 @@ class LearnerIdentityTest {
     @Test
     void studentIdRejectsJwtWithoutStudentIdentity() {
         Jwt jwt = jwt(Map.of("scope", "read"));
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(jwt);
 
         ResponseStatusException exception = assertThrows(
                 ResponseStatusException.class,
-                () -> learnerIdentity.studentId(new JwtAuthenticationToken(jwt))
+                () -> learnerIdentity.studentId(authentication)
         );
 
         assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());

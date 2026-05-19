@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.lang.NonNull;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -86,7 +87,7 @@ public class SecurityConfig {
         }
 
         @Override
-        public Collection<GrantedAuthority> convert(Jwt jwt) {
+        public Collection<GrantedAuthority> convert(@NonNull Jwt jwt) {
             List<GrantedAuthority> authorities = new ArrayList<>();
             Object roles = jwt.getClaims().get(rolesClaim);
 

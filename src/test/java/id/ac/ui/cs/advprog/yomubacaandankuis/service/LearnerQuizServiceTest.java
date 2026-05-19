@@ -133,10 +133,12 @@ class LearnerQuizServiceTest {
 
     @Test
     void submitQuizRejectedWhenAttemptHasNotStarted() {
+        Map<Integer, String> emptyAnswers = Map.of();
+
         when(quizAttemptRepository.findByStudentIdAndReadingId("student-1", 3))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> learnerQuizService.submitQuiz("student-1", 3, Map.of()))
+        assertThatThrownBy(() -> learnerQuizService.submitQuiz("student-1", 3, emptyAnswers))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(exception -> {
                     ResponseStatusException responseStatusException = (ResponseStatusException) exception;
@@ -152,11 +154,12 @@ class LearnerQuizServiceTest {
     void submitQuizRejectedWhenAttemptAlreadyCompleted() {
         QuizAttempt attempt = new QuizAttempt();
         attempt.setStatus(QuizAttemptStatus.COMPLETED);
+        Map<Integer, String> emptyAnswers = Map.of();
 
         when(quizAttemptRepository.findByStudentIdAndReadingId("student-1", 3))
                 .thenReturn(Optional.of(attempt));
 
-        assertThatThrownBy(() -> learnerQuizService.submitQuiz("student-1", 3, Map.of()))
+        assertThatThrownBy(() -> learnerQuizService.submitQuiz("student-1", 3, emptyAnswers))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(exception -> {
                     ResponseStatusException responseStatusException = (ResponseStatusException) exception;
