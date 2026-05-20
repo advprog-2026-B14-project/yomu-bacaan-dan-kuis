@@ -16,6 +16,9 @@ jobs:
   build:
     name: Build and analyze
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,11 +34,26 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Test, Coverage, and Sonar Analysis
+      - name: Run tests and generate coverage
+        run: ./gradlew test jacocoTestReport
+
+      - name: Verify coverage threshold
+        run: ./gradlew jacocoTestCoverageVerification
+
+      - name: Verify Sonar token is configured
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "SONAR_TOKEN repository secret is not configured."
+            exit 1
+          fi
+
+      - name: SonarCloud analysis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: ./gradlew test jacocoTestReport sonar --info
+        run: ./gradlew sonar --info
 
       - name: Upload Coverage Report
         if: always()

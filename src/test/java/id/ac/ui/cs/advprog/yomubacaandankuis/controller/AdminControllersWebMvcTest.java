@@ -1,5 +1,8 @@
 package id.ac.ui.cs.advprog.yomubacaandankuis.controller;
 
+import id.ac.ui.cs.advprog.yomubacaandankuis.config.DevHeaderAuthenticationFilter;
+import id.ac.ui.cs.advprog.yomubacaandankuis.config.InternalServiceTokenFilter;
+import id.ac.ui.cs.advprog.yomubacaandankuis.config.SecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.CategoryRequest;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.CategoryResponse;
@@ -14,9 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -37,7 +43,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         AdminReadingController.class,
         AdminQuizController.class
 })
-@Import(RestExceptionHandler.class)
+@Import({
+        RestExceptionHandler.class,
+        SecurityConfig.class,
+        InternalServiceTokenFilter.class,
+        DevHeaderAuthenticationFilter.class
+})
 class AdminControllersWebMvcTest {
 
     @Autowired
@@ -46,20 +57,32 @@ class AdminControllersWebMvcTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private CategoryService categoryService;
 
-    @MockBean
+    @MockitoBean
     private ReadingService readingService;
 
-    @MockBean
+    @MockitoBean
     private QuizService quizService;
+
+    @Test
+    void adminEndpointRejectsMissingToken() throws Exception {
+        mockMvc.perform(get("/api/admin/categories"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminEndpointRejectsNonAdminRole() throws Exception {
+        mockMvc.perform(get("/api/admin/categories").with(learnerJwt()))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void getAllCategoriesReturnsServiceResponse() throws Exception {
         when(categoryService.findAll()).thenReturn(List.of(categoryResponse(1, "Science")));
 
-        mockMvc.perform(get("/api/admin/categories"))
+        mockMvc.perform(get("/api/admin/categories").with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].name").value("Science"));
@@ -69,7 +92,7 @@ class AdminControllersWebMvcTest {
     void getCategoryByIdReturnsServiceResponse() throws Exception {
         when(categoryService.findById(2)).thenReturn(categoryResponse(2, "History"));
 
-        mockMvc.perform(get("/api/admin/categories/2"))
+        mockMvc.perform(get("/api/admin/categories/2").with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.name").value("History"));
@@ -82,6 +105,7 @@ class AdminControllersWebMvcTest {
         when(categoryService.create(any(CategoryRequest.class))).thenReturn(categoryResponse(3, "Literature"));
 
         mockMvc.perform(post("/api/admin/categories")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -96,6 +120,7 @@ class AdminControllersWebMvcTest {
         when(categoryService.update(any(), any(CategoryRequest.class))).thenReturn(categoryResponse(4, "Updated"));
 
         mockMvc.perform(put("/api/admin/categories/4")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -107,7 +132,7 @@ class AdminControllersWebMvcTest {
     void deleteCategoryReturnsNoContent() throws Exception {
         doNothing().when(categoryService).delete(5);
 
-        mockMvc.perform(delete("/api/admin/categories/5"))
+        mockMvc.perform(delete("/api/admin/categories/5").with(adminJwt()))
                 .andExpect(status().isNoContent());
 
         verify(categoryService).delete(5);
@@ -116,6 +141,7 @@ class AdminControllersWebMvcTest {
     @Test
     void createCategoryReturnsValidationErrors() throws Exception {
         mockMvc.perform(post("/api/admin/categories")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":""}
@@ -129,7 +155,7 @@ class AdminControllersWebMvcTest {
     void getAllReadingsReturnsServiceResponse() throws Exception {
         when(readingService.findAll()).thenReturn(List.of(readingResponse(1, 10, "Gravity")));
 
-        mockMvc.perform(get("/api/admin/readings"))
+        mockMvc.perform(get("/api/admin/readings").with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].categoryId").value(10));
@@ -139,7 +165,7 @@ class AdminControllersWebMvcTest {
     void getReadingByIdReturnsServiceResponse() throws Exception {
         when(readingService.findById(2)).thenReturn(readingResponse(2, 11, "Solar System"));
 
-        mockMvc.perform(get("/api/admin/readings/2"))
+        mockMvc.perform(get("/api/admin/readings/2").with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.title").value("Solar System"));
@@ -154,6 +180,7 @@ class AdminControllersWebMvcTest {
         when(readingService.create(any(ReadingRequest.class))).thenReturn(readingResponse(3, 7, "Gravity"));
 
         mockMvc.perform(post("/api/admin/readings")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -170,6 +197,7 @@ class AdminControllersWebMvcTest {
         when(readingService.update(any(), any(ReadingRequest.class))).thenReturn(readingResponse(4, 8, "Updated Reading"));
 
         mockMvc.perform(put("/api/admin/readings/4")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -180,7 +208,7 @@ class AdminControllersWebMvcTest {
     void deleteReadingReturnsNoContent() throws Exception {
         doNothing().when(readingService).delete(5);
 
-        mockMvc.perform(delete("/api/admin/readings/5"))
+        mockMvc.perform(delete("/api/admin/readings/5").with(adminJwt()))
                 .andExpect(status().isNoContent());
 
         verify(readingService).delete(5);
@@ -190,7 +218,7 @@ class AdminControllersWebMvcTest {
     void getAllQuizzesReturnsServiceResponse() throws Exception {
         when(quizService.findAll()).thenReturn(List.of(quizResponse(1, 9, "What is gravity?")));
 
-        mockMvc.perform(get("/api/admin/quizzes"))
+        mockMvc.perform(get("/api/admin/quizzes").with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].readingId").value(9));
@@ -200,7 +228,7 @@ class AdminControllersWebMvcTest {
     void getQuizByIdReturnsServiceResponse() throws Exception {
         when(quizService.findById(2)).thenReturn(quizResponse(2, 9, "Question"));
 
-        mockMvc.perform(get("/api/admin/quizzes/2"))
+        mockMvc.perform(get("/api/admin/quizzes/2").with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.question").value("Question"));
@@ -212,6 +240,7 @@ class AdminControllersWebMvcTest {
         when(quizService.create(any(QuizRequest.class))).thenReturn(quizResponse(3, 6, "What is gravity?"));
 
         mockMvc.perform(post("/api/admin/quizzes")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -226,6 +255,7 @@ class AdminControllersWebMvcTest {
         when(quizService.update(any(), any(QuizRequest.class))).thenReturn(quizResponse(4, 12, "Updated question"));
 
         mockMvc.perform(put("/api/admin/quizzes/4")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -236,7 +266,7 @@ class AdminControllersWebMvcTest {
     void deleteQuizReturnsNoContent() throws Exception {
         doNothing().when(quizService).delete(6);
 
-        mockMvc.perform(delete("/api/admin/quizzes/6"))
+        mockMvc.perform(delete("/api/admin/quizzes/6").with(adminJwt()))
                 .andExpect(status().isNoContent());
 
         verify(quizService).delete(6);
@@ -274,5 +304,13 @@ class AdminControllersWebMvcTest {
         request.setOptionD("Ocean");
         request.setCorrectAnswer("A");
         return request;
+    }
+
+    private RequestPostProcessor adminJwt() {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private RequestPostProcessor learnerJwt() {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_LEARNER"));
     }
 }
