@@ -9,7 +9,8 @@ on:
   pull_request:
     branches: [ "main", "staging" ]
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   analysis:
