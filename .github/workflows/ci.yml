@@ -1,0 +1,50 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [ "main", "staging", "ci-cd" ]
+  pull_request:
+    branches: [ "main", "staging" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run Tests and Quality Check
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out the Git repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java toolchain
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: "temurin"
+          java-version: "21"
+          cache: "gradle"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run unit tests & JaCoCo
+        run: ./gradlew test jacocoTestReport
+
+      - name: Verify 100% code coverage
+        run: ./gradlew jacocoTestCoverageVerification
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: test-reports
+          path: build/reports/tests/test
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coverage-reports
+          path: build/reports/jacoco/test/html

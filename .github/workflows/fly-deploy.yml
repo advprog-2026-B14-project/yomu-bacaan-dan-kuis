@@ -1,0 +1,33 @@
+name: Deploy to Fly.io
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - staging
+      - feat/milestone-100
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Bacaan dan Kuis Backend
+    runs-on: ubuntu-latest
+    environment:
+      name: fly-io
+      url: https://yomu-bacaan-dan-kuis-b14-hanif.fly.dev
+
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
+
+      - name: Deploy to Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only --app yomu-bacaan-dan-kuis-b14-hanif

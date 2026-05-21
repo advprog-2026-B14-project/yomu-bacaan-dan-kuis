@@ -30,18 +30,33 @@ repositories {
 }
 
 dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
+
     compileOnly("org.projectlombok:lombok")
+
     developmentOnly("org.springframework.boot:spring-boot-devtools")
+
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     annotationProcessor("org.projectlombok:lombok")
+
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+    runtimeOnly("org.postgresql:postgresql")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("com.h2database:h2")
     testImplementation("org.seleniumhq.selenium:selenium-java:$seleniumJavaVersion")
     testImplementation("io.github.bonigarcia:selenium-jupiter:$seleniumJupiterVersion")
     testImplementation("io.github.bonigarcia:webdrivermanager:$webdrivermanagerVersion")
     testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
+
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.test {
@@ -49,7 +64,7 @@ tasks.test {
     filter {
         excludeTestsMatching("*FunctionalTest")
     }
-    finalizedBy(tasks.jacocoTestReport)
+    finalizedBy(tasks.jacocoTestReport, tasks.jacocoTestCoverageVerification)
 }
 
 tasks.register<Test>("unitTest") {
@@ -75,6 +90,66 @@ tasks.jacocoTestReport {
     reports {
         xml.required.set(true) 
         html.required.set(true)
+        csv.required.set(false)
+    }
+
+    // Exclude Spring Boot Application class from coverage report
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) {
+                exclude("**/YomuBacaanDanKuisApplication.class")
+            }
+        })
+    )
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.jacocoTestReport)
+    onlyIf {
+        tasks.test.get().filter.includePatterns.isEmpty()
+    }
+
+    // Exclude Spring Boot Application class from coverage verification
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) {
+                exclude("**/YomuBacaanDanKuisApplication.class")
+            }
+        })
+    )
+    
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+        rule {
+            element = "CLASS"
+            excludes = listOf(
+                "id.ac.ui.cs.advprog.yomubacaandankuis.config.*",
+                "id.ac.ui.cs.advprog.yomubacaandankuis.dto.*",
+                "id.ac.ui.cs.advprog.yomubacaandankuis.model.*"
+            )
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.70".toBigDecimal()
+            }
+        }
+        rule {
+            element = "CLASS"
+            excludes = listOf(
+                "id.ac.ui.cs.advprog.yomubacaandankuis.config.*",
+                "id.ac.ui.cs.advprog.yomubacaandankuis.dto.*",
+                "id.ac.ui.cs.advprog.yomubacaandankuis.model.*"
+            )
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.70".toBigDecimal()
+            }
+        }
     }
 }
 
@@ -84,5 +159,8 @@ sonar {
         property("sonar.organization", "advprog-2026-b14-project")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
+
+        // Exclude Spring Boot App class
+        property("sonar.coverage.exclusions", "**/YomuBacaanDanKuisApplication.java")
     }
 }
