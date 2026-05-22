@@ -3,6 +3,7 @@ name: Continuous Deployment (CD)
 on:
   push:
     branches:
+      - feat/milestone-100
       - staging
       - main
   workflow_dispatch:
