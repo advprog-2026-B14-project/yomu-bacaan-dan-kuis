@@ -36,6 +36,8 @@ flowchart TB
 
     subgraph Frontend["Frontend - Yomu Frontend"]
         BacaanKuisModule["BacaanKuisModule<br/>Next.js Component<br/><br/>Menampilkan daftar bacaan, mode kuis,<br/>form admin, dan hasil pengerjaan"]
+        BackendProxy["Next.js API Proxy<br/>/api/backend/[...path]"]
+        LeagueProxy["Next.js League Proxy<br/>/api/league/statistics/students/{studentId}"]
     end
 
     subgraph Backend["Backend - Yomu Bacaan dan Kuis Service"]
@@ -65,12 +67,16 @@ flowchart TB
 
     User -->|"Mengakses halaman /bacaan-kuis"| BacaanKuisModule
 
-    BacaanKuisModule -->|"REST /api/admin/categories"| AdminCategoryController
-    BacaanKuisModule -->|"REST /api/admin/readings"| AdminReadingController
-    BacaanKuisModule -->|"REST /api/admin/quizzes"| AdminQuizController
-    BacaanKuisModule -->|"REST /api/learner/readings/{readingId}"| LearnerReadingController
+    BacaanKuisModule -->|"Frontend request"| BackendProxy
+    BacaanKuisModule -->|"Statistik Liga"| LeagueProxy
 
-    ExternalService -->|"REST internal statistics"| InternalStatisticsController
+    BackendProxy -->|"REST /api/admin/categories"| AdminCategoryController
+    BackendProxy -->|"REST /api/admin/readings"| AdminReadingController
+    BackendProxy -->|"REST /api/admin/quizzes"| AdminQuizController
+    BackendProxy -->|"REST /api/learner/readings/{readingId}"| LearnerReadingController
+    LeagueProxy -->|"REST internal statistics + token"| InternalStatisticsController
+
+    ExternalService -->|"REST internal statistics + token"| InternalStatisticsController
 
     AdminCategoryController --> CategoryService
     AdminReadingController --> ReadingService
@@ -101,7 +107,7 @@ flowchart TB
     classDef database fill:#374151,stroke:#d1d5db,color:#ffffff,stroke-width:2px;
     classDef actor fill:#1f2937,stroke:#94a3b8,color:#ffffff,stroke-width:1px;
 
-    class BacaanKuisModule frontend;
+    class BacaanKuisModule,BackendProxy,LeagueProxy frontend;
     class AdminCategoryController,AdminReadingController,AdminQuizController,LearnerReadingController,InternalStatisticsController controller;
     class CategoryService,ReadingService,QuizService,LearnerQuizService,LearningStatisticsService service;
     class CategoryRepository,ReadingRepository,QuizRepository,QuizAttemptRepository repository;
@@ -123,7 +129,7 @@ sequenceDiagram
     participant DB as PostgreSQL/Supabase
 
     Learner->>FE: Membuka bacaan dan kuis
-    FE->>Controller: GET /api/learner/readings/{readingId}
+    FE->>Controller: GET /api/learner/readings/{readingId} via Next.js proxy
     Controller->>Service: getReadingForLearner(studentId, readingId)
     Service->>ReadingRepo: findById(readingId)
     ReadingRepo->>DB: Query reading
@@ -132,7 +138,7 @@ sequenceDiagram
     Service-->>Controller: LearnerReadingResponse
     Controller-->>FE: Reading response
 
-    FE->>Controller: POST /api/learner/readings/{readingId}/quiz/start
+    FE->>Controller: POST /api/learner/readings/{readingId}/quiz/start via Next.js proxy
     Controller->>Service: startQuiz(studentId, readingId)
     Service->>AttemptRepo: existsByStudentIdAndReadingIdAndStatus(...)
     AttemptRepo->>DB: Check completed attempt
@@ -140,7 +146,7 @@ sequenceDiagram
     Service->>AttemptRepo: save(new QuizAttempt)
     AttemptRepo->>DB: Insert quiz attempt
 
-    FE->>Controller: GET /api/learner/readings/{readingId}/quiz
+    FE->>Controller: GET /api/learner/readings/{readingId}/quiz via Next.js proxy
     Controller->>Service: getQuizQuestionsForLearner(studentId, readingId)
     Service->>QuizRepo: findByReadingId(readingId)
     QuizRepo->>DB: Query quiz questions
@@ -148,16 +154,18 @@ sequenceDiagram
     Service-->>Controller: LearnerQuizQuestionResponse[]
     Controller-->>FE: Questions without correctAnswer
 
-    FE->>Controller: POST /api/learner/readings/{readingId}/quiz/submit
-    Controller->>Service: submitQuiz(studentId, readingId, answers)
+    FE->>Controller: POST /api/learner/readings/{readingId}/quiz/submit via Next.js proxy
+    Controller->>Service: submitQuizWithReview(studentId, readingId, answers)
     Service->>AttemptRepo: findByStudentIdAndReadingId(studentId, readingId)
     AttemptRepo->>DB: Query attempt
+    Service->>Service: Reject if attempt already COMPLETED
     Service->>QuizRepo: findByReadingId(readingId)
     QuizRepo->>DB: Query correct answers
-    Service->>Service: Calculate score
+    Service->>Service: Calculate score and correctAnswers
     Service->>AttemptRepo: save(completed attempt)
     AttemptRepo->>DB: Update attempt score and status
-    Controller-->>FE: LearnerSubmitQuizResponse
+    Controller-->>FE: LearnerSubmitQuizResponse(score, totalQuestions, correctAnswers)
+    FE->>FE: Show review-only mode
 ```
 
 ### Admin Content Management Flow
@@ -217,7 +225,7 @@ sequenceDiagram
     participant QuizRepo as QuizRepository
     participant DB as PostgreSQL/Supabase
 
-    External->>Controller: GET /api/internal/league/statistics/students/{studentId}
+    External->>Controller: GET /api/internal/league/statistics/students/{studentId}<br/>X-Internal-Service-Token
     Controller->>Service: getStudentStatistics(studentId)
     Service->>AttemptRepo: findByStudentIdAndStatus(studentId, COMPLETED)
     AttemptRepo->>DB: Query completed attempts
