@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.yomubacaandankuis.service;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerReadingResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerQuizQuestionResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerSubmitQuizResponse;
+import id.ac.ui.cs.advprog.yomubacaandankuis.dto.QuizCompletedEvent;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.Category;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.Quiz;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.QuizAttempt;
@@ -43,11 +44,19 @@ class LearnerQuizServiceTest {
     @Mock
     private ReadingRepository readingRepository;
 
+    @Mock
+    private QuizCompletedEventPublisher quizCompletedEventPublisher;
+
     private LearnerQuizService learnerQuizService;
 
     @BeforeEach
     void setUp() {
-        learnerQuizService = new LearnerQuizService(quizAttemptRepository, quizRepository, readingRepository);
+        learnerQuizService = new LearnerQuizService(
+                quizAttemptRepository,
+                quizRepository,
+                readingRepository,
+                quizCompletedEventPublisher
+        );
     }
 
     @Test
@@ -129,6 +138,7 @@ class LearnerQuizServiceTest {
         assertThat(attempt.getCompletedAt()).isNotNull();
         assertThat(attempt.getScore()).isEqualTo(1);
         verify(quizAttemptRepository).save(attempt);
+        verify(quizCompletedEventPublisher).publish(any(QuizCompletedEvent.class));
     }
 
     @Test
@@ -148,6 +158,7 @@ class LearnerQuizServiceTest {
 
         verify(quizRepository, never()).findByReadingId(3);
         verify(quizAttemptRepository, never()).save(any(QuizAttempt.class));
+        verify(quizCompletedEventPublisher, never()).publish(any(QuizCompletedEvent.class));
     }
 
     @Test
@@ -169,6 +180,7 @@ class LearnerQuizServiceTest {
 
         verify(quizRepository, never()).findByReadingId(3);
         verify(quizAttemptRepository, never()).save(any(QuizAttempt.class));
+        verify(quizCompletedEventPublisher, never()).publish(any(QuizCompletedEvent.class));
     }
 
     @Test
@@ -185,6 +197,7 @@ class LearnerQuizServiceTest {
         assertThat(score).isZero();
         assertThat(attempt.getStatus()).isEqualTo(QuizAttemptStatus.COMPLETED);
         verify(quizAttemptRepository).save(attempt);
+        verify(quizCompletedEventPublisher).publish(any(QuizCompletedEvent.class));
     }
 
     @Test
@@ -212,6 +225,7 @@ class LearnerQuizServiceTest {
         assertThat(response.getTotalQuestions()).isEqualTo(2);
         assertThat(response.getCorrectAnswers()).containsEntry(101, "A").containsEntry(102, "B");
         assertThat(attempt.getStatus()).isEqualTo(QuizAttemptStatus.COMPLETED);
+        verify(quizCompletedEventPublisher).publish(any(QuizCompletedEvent.class));
     }
 
     @Test

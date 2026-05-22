@@ -9,6 +9,7 @@ Backend ini menangani modul Bacaan dan Kuis di Yomu. Scope utamanya adalah data 
 - Spring Web dan Spring Security
 - Spring Data JPA
 - PostgreSQL/Supabase
+- REST event `QUIZ_COMPLETED` untuk update modul lain
 - Actuator dan Prometheus metrics
 - JaCoCo dan SonarCloud
 - Fly.io untuk deployment
@@ -94,12 +95,12 @@ flowchart TB
     LearnerQuizService --> ReadingRepository
     LearningStatisticsService --> QuizAttemptRepository
     LearningStatisticsService --> QuizRepository
+    LearnerQuizService -->|"Publish QUIZ_COMPLETED via REST"| ExternalService
 
     CategoryRepository --> Database
     ReadingRepository --> Database
     QuizRepository --> Database
     QuizAttemptRepository --> Database
-
     classDef frontend fill:#2563eb,stroke:#93c5fd,color:#ffffff,stroke-width:2px;
     classDef controller fill:#7c3aed,stroke:#c4b5fd,color:#ffffff,stroke-width:2px;
     classDef service fill:#047857,stroke:#6ee7b7,color:#ffffff,stroke-width:2px;
@@ -125,6 +126,8 @@ sequenceDiagram
     participant Service as LearnerQuizService
     participant AttemptRepo as QuizAttemptRepository
     participant QuizRepo as QuizRepository
+    participant EventPublisher as QuizCompletedEventPublisher
+    participant External as Modul lain
     participant ReadingRepo as ReadingRepository
     participant DB as PostgreSQL/Supabase
 
@@ -164,6 +167,8 @@ sequenceDiagram
     Service->>Service: Calculate score and correctAnswers
     Service->>AttemptRepo: save(completed attempt)
     AttemptRepo->>DB: Update attempt score and status
+    Service->>EventPublisher: publish(QUIZ_COMPLETED)
+    EventPublisher->>External: POST completion event via REST
     Controller-->>FE: LearnerSubmitQuizResponse(score, totalQuestions, correctAnswers)
     FE->>FE: Show review-only mode
 ```
@@ -252,6 +257,7 @@ Fitur utama backend:
 - Pencegahan pengerjaan ulang untuk quiz attempt yang sudah selesai.
 - Response review setelah submit agar frontend dapat menampilkan jawaban benar tanpa membocorkan kunci jawaban sebelum submit.
 - Statistik internal untuk akurasi, jumlah quiz selesai, total jawaban benar, dan total soal.
+- Event REST `QUIZ_COMPLETED` setelah learner berhasil menyelesaikan kuis.
 
 ## Design Pattern
 
@@ -288,6 +294,32 @@ GET    /api/internal/league/statistics/students/{studentId}
 ```
 
 Endpoint learner tidak mengirim `correctAnswer` saat soal diambil. Kunci jawaban hanya dikirim sebagai bagian dari response submit untuk kebutuhan review.
+
+## Event REST
+
+Setelah kuis berhasil disubmit dan attempt berubah menjadi `COMPLETED`, backend dapat mengirim event ke endpoint internal modul lain.
+
+```text
+POST ${QUIZ_COMPLETED_EVENT_URL}
+Header: X-Internal-Service-Token: <token>
+Event type: QUIZ_COMPLETED
+```
+
+Payload:
+
+```json
+{
+  "eventType": "QUIZ_COMPLETED",
+  "studentId": "13123",
+  "readingId": 16,
+  "score": 4,
+  "correctAnswers": 4,
+  "totalQuestions": 5,
+  "completedAt": "2026-05-22T10:00:00"
+}
+```
+
+Event ini dipakai agar modul lain seperti Achievement atau Liga bisa mendapat sinyal completion tanpa membaca data mentah pengerjaan kuis. Jika `QUIZ_COMPLETED_EVENT_URL` belum diisi, publish event dilewati dan flow submit quiz tetap berjalan normal.
 
 ## Security
 
@@ -351,6 +383,9 @@ CORS_ALLOWED_ORIGINS
 JWT_ISSUER_URI atau JWT_JWK_SET_URI
 INTERNAL_SERVICE_TOKEN
 SECURITY_DEV_AUTH_ENABLED
+QUIZ_COMPLETED_EVENT_URL
+QUIZ_COMPLETED_EVENT_TOKEN_HEADER
+QUIZ_COMPLETED_EVENT_TOKEN
 ```
 
 Frontend mengakses backend melalui proxy Next.js dengan:

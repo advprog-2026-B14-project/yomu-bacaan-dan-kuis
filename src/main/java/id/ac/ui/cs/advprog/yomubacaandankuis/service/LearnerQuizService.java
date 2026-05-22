@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.yomubacaandankuis.service;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerQuizQuestionResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerReadingResponse;
 import id.ac.ui.cs.advprog.yomubacaandankuis.dto.LearnerSubmitQuizResponse;
+import id.ac.ui.cs.advprog.yomubacaandankuis.dto.QuizCompletedEvent;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.Quiz;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.QuizAttempt;
 import id.ac.ui.cs.advprog.yomubacaandankuis.model.QuizAttemptStatus;
@@ -27,15 +28,18 @@ public class LearnerQuizService {
     private final QuizAttemptRepository quizAttemptRepository;
     private final QuizRepository quizRepository;
     private final ReadingRepository readingRepository;
+    private final QuizCompletedEventPublisher quizCompletedEventPublisher;
 
     public LearnerQuizService(
             QuizAttemptRepository quizAttemptRepository,
             QuizRepository quizRepository,
-            ReadingRepository readingRepository
+            ReadingRepository readingRepository,
+            QuizCompletedEventPublisher quizCompletedEventPublisher
     ) {
         this.quizAttemptRepository = quizAttemptRepository;
         this.quizRepository = quizRepository;
         this.readingRepository = readingRepository;
+        this.quizCompletedEventPublisher = quizCompletedEventPublisher;
     }
 
     public void startQuiz(String studentId, Integer readingId) {
@@ -83,6 +87,15 @@ public class LearnerQuizService {
 
         Map<Integer, String> correctAnswers = quizzes.stream()
                 .collect(java.util.stream.Collectors.toMap(Quiz::getId, Quiz::getCorrectAnswer));
+
+        quizCompletedEventPublisher.publish(QuizCompletedEvent.of(
+                studentId,
+                readingId,
+                score,
+                score,
+                quizzes.size(),
+                attempt.getCompletedAt()
+        ));
 
         return new LearnerSubmitQuizResponse(score, quizzes.size(), correctAnswers);
     }
