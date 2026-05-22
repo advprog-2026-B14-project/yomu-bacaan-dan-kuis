@@ -116,6 +116,128 @@ flowchart TB
     class User,ExternalService actor;
 ```
 
+### Code Diagram
+
+```mermaid
+classDiagram
+    direction LR
+
+    class LearnerReadingController {
+        +getReading(readingId)
+        +startQuiz(readingId)
+        +getQuizQuestions(readingId)
+        +submitQuiz(readingId, request)
+    }
+
+    class InternalLearningStatisticsController {
+        +getStudentStatistics(studentId)
+    }
+
+    class AdminCategoryController
+    class AdminReadingController
+    class AdminQuizController
+
+    class LearnerQuizService {
+        +getReadingForLearner(studentId, readingId)
+        +startQuiz(studentId, readingId)
+        +getQuizQuestionsForLearner(studentId, readingId)
+        +submitQuizWithReview(studentId, readingId, answers)
+    }
+
+    class LearningStatisticsService {
+        +getStudentStatistics(studentId)
+    }
+
+    class CategoryService
+    class ReadingService
+    class QuizService
+
+    class QuizCompletedEventPublisher {
+        <<interface>>
+        +publish(event)
+    }
+
+    class RestQuizCompletedEventPublisher {
+        +publish(event)
+    }
+
+    class CategoryRepository {
+        <<Spring Data Repository>>
+    }
+
+    class ReadingRepository {
+        <<Spring Data Repository>>
+    }
+
+    class QuizRepository {
+        <<Spring Data Repository>>
+        +findByReadingId(readingId)
+        +countByReadingId(readingId)
+    }
+
+    class QuizAttemptRepository {
+        <<Spring Data Repository>>
+        +findByStudentIdAndReadingId(studentId, readingId)
+        +findByStudentIdAndStatus(studentId, status)
+    }
+
+    class Category
+    class Reading
+    class Quiz
+    class QuizAttempt
+
+    class LearnerReadingResponse {
+        <<DTO>>
+    }
+
+    class LearnerQuizQuestionResponse {
+        <<DTO>>
+    }
+
+    class LearnerSubmitQuizResponse {
+        <<DTO>>
+    }
+
+    class LearningStatisticsResponse {
+        <<DTO>>
+    }
+
+    class QuizCompletedEvent {
+        <<DTO>>
+    }
+
+    LearnerReadingController --> LearnerQuizService
+    InternalLearningStatisticsController --> LearningStatisticsService
+    AdminCategoryController --> CategoryService
+    AdminReadingController --> ReadingService
+    AdminQuizController --> QuizService
+
+    LearnerQuizService --> ReadingRepository
+    LearnerQuizService --> QuizRepository
+    LearnerQuizService --> QuizAttemptRepository
+    LearnerQuizService --> QuizCompletedEventPublisher
+    LearningStatisticsService --> QuizAttemptRepository
+    LearningStatisticsService --> QuizRepository
+    CategoryService --> CategoryRepository
+    ReadingService --> ReadingRepository
+    ReadingService --> CategoryRepository
+    QuizService --> QuizRepository
+    QuizService --> ReadingRepository
+
+    RestQuizCompletedEventPublisher ..|> QuizCompletedEventPublisher
+
+    CategoryRepository --> Category
+    ReadingRepository --> Reading
+    QuizRepository --> Quiz
+    QuizAttemptRepository --> QuizAttempt
+
+    LearnerQuizService --> LearnerReadingResponse
+    LearnerQuizService --> LearnerQuizQuestionResponse
+    LearnerQuizService --> LearnerSubmitQuizResponse
+    LearningStatisticsService --> LearningStatisticsResponse
+    QuizCompletedEventPublisher --> QuizCompletedEvent
+```
+
 ### Learner Quiz Flow
 
 ```mermaid
