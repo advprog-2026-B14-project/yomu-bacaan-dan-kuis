@@ -305,21 +305,26 @@ Header: X-Internal-Service-Token: <token>
 Event type: QUIZ_COMPLETED
 ```
 
+Untuk integrasi Liga, `QUIZ_COMPLETED_EVENT_URL` dapat diarahkan ke endpoint add-score Liga. Di branch `main` Liga saat ini endpoint yang terbaca adalah `POST /liga/add-score`; jika tim Liga mengganti ke `/liga/clan/add-score`, cukup ubah nilai environment URL tanpa ubah kode Bacaan-Kuis.
+
 Payload:
 
 ```json
 {
   "eventType": "QUIZ_COMPLETED",
-  "studentId": "13123",
+  "studentId": "550e8400-e29b-41d4-a716-446655440000",
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
   "readingId": 16,
   "score": 4,
+  "points": 4.0,
+  "pointsGained": 4.0,
   "correctAnswers": 4,
   "totalQuestions": 5,
   "completedAt": "2026-05-22T10:00:00"
 }
 ```
 
-Event ini dipakai agar modul lain seperti Achievement atau Liga bisa mendapat sinyal completion tanpa membaca data mentah pengerjaan kuis. Jika `QUIZ_COMPLETED_EVENT_URL` belum diisi, publish event dilewati dan flow submit quiz tetap berjalan normal.
+Event ini dipakai agar modul lain seperti Achievement atau Liga bisa mendapat sinyal completion tanpa membaca data mentah pengerjaan kuis. Untuk Liga, `userId` mengikuti UUID Auth yang sama dengan `studentId`, sedangkan `points`/`pointsGained` berisi skor kuis yang perlu ditambahkan. Jika `QUIZ_COMPLETED_EVENT_URL` belum diisi, publish event dilewati dan flow submit quiz tetap berjalan normal.
 
 ## Security
 
