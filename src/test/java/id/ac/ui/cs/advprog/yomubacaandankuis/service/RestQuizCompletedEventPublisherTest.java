@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.springframework.test.web.client.ExpectedCount.once;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -33,6 +34,11 @@ class RestQuizCompletedEventPublisherTest {
         server.expect(once(), requestTo("https://achievement.example.test/internal/events"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("X-Internal-Service-Token", "token"))
+                .andExpect(jsonPath("$.eventType").value("QUIZ_COMPLETED"))
+                .andExpect(jsonPath("$.studentId").value("student-1"))
+                .andExpect(jsonPath("$.userId").value("student-1"))
+                .andExpect(jsonPath("$.points").value(4.0))
+                .andExpect(jsonPath("$.pointsGained").value(4.0))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         publisher.publish(event());
